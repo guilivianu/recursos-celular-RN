@@ -8,8 +8,20 @@ import {
   Dimensions,
 } from "react-native";
 import MaterialIcons from "@expo/vector-icons/MaterialIcons";
+import {
+  Gesture,
+  GestureHandlerRootView,
+  GestureDetector,
+} from "react-native-gesture-handler";
+import Animated, {
+  useAnimatedStyle,
+  useSharedValue,
+} from "react-native-reanimated";
 
 const { width, height } = Dimensions.get("screen");
+function clamp(val, min, max) {
+  return Math.min(Math.max(val, min), max);
+}
 
 export default function ModalEditImage({
   image,
@@ -17,23 +29,81 @@ export default function ModalEditImage({
   visible,
   onClose,
 }) {
+  // Alterar o tamanho da imagem
+  const startScale = useSharedValue(0);
+  const scale = useSharedValue(1);
+
+  const pinch = Gesture.Pinch()
+    .onStart(() => {
+      startScale.value = scale.value;
+    })
+    .onUpdate((event) => {
+      scale.value = clamp(
+        startScale.value * event.scale,
+        0.3,
+        Math.min(width / 100, height / 100)
+      );
+    })
+    .runOnJS(true);
+
+  // Alterar a posição da imagem
+  const translateX = useSharedValue(0);
+  const translateY = useSharedValue(0);
+
+  const drag = Gesture.Pan().onChange((event) => {
+    translateX.value += event.changeX / scale.value;
+    translateY.value += event.changeY / scale.value;
+  });
+
+  // Rotacionar imagem
+  const startAngle = useSharedValue(0);
+  const angle = useSharedValue(0);
+
+  const rotation = Gesture.Rotation()
+    .onStart(() => {
+      startAngle.value = angle.value;
+    })
+    .onUpdate((event) => {
+      angle.value = startAngle.value + event.rotation;
+    });
+
+  const gestures = Gesture.Simultaneous(pinch, drag, rotation);
+
+  const imageAnimatedStyles = useAnimatedStyle(() => ({
+    transform: [
+      { scaleX: imageMirror },
+      { scale: scale.value },
+      { translateX: imageMirror === -1 ? -translateX.value : translateX.value },
+      { translateY: translateY.value },
+      {
+        rotate: imageMirror === -1 ? `${-angle.value}rad` : `${angle.value}rad`,
+      },
+    ],
+  }));
+
   return (
     <Modal style={styles.container} visible={visible} animationType="slide">
       {/* IMAGEM */}
-      <SafeAreaView style={styles.container}>
-        {/* ÁREA DELIMITADA DA IMAGEM */}
-        <View style={styles.imageArea}>
-          {/* IMAGEM */}
-          <Image
-            source={{ uri: image.uri }}
-            style={{
-              width: (image.width * height) / image.height,
-              height: height,
-              transform: [{ scaleX: imageMirror }],
-            }}
-          />
-        </View>
-      </SafeAreaView>
+      <GestureHandlerRootView>
+        <GestureDetector gesture={gestures}>
+          <SafeAreaView style={styles.container}>
+            {/* ÁREA DELIMITADA DA IMAGEM */}
+            <View style={styles.imageArea}>
+              {/* IMAGEM */}
+              <Animated.Image
+                source={{ uri: image.uri }}
+                style={[
+                  {
+                    width: (image.width * height) / image.height,
+                    height: height,
+                  },
+                  imageAnimatedStyles,
+                ]}
+              />
+            </View>
+          </SafeAreaView>
+        </GestureDetector>
+      </GestureHandlerRootView>
 
       {/* BOTÕES */}
       <View style={styles.buttonContainerModal}>
