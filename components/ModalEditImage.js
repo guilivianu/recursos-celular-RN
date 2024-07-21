@@ -18,6 +18,10 @@ import Animated, {
   useSharedValue,
 } from "react-native-reanimated";
 
+import StickerPicker from "./stickerPicker";
+import { useState } from "react";
+import Sticker from "./Sticker";
+
 const { width, height } = Dimensions.get("screen");
 function clamp(val, min, max) {
   return Math.min(Math.max(val, min), max);
@@ -29,6 +33,9 @@ export default function ModalEditImage({
   visible,
   onClose,
 }) {
+  const [modalSticker, setModalSticker] = useState(false);
+  const [selectedSticker, setSelectedSticker] = useState();
+
   // Alterar o tamanho da imagem
   const startScale = useSharedValue(0);
   const scale = useSharedValue(1);
@@ -89,6 +96,8 @@ export default function ModalEditImage({
           <SafeAreaView style={styles.container}>
             {/* ÁREA DELIMITADA DA IMAGEM */}
             <View style={styles.imageArea}>
+              {selectedSticker && <Sticker stickerSource={selectedSticker} />}
+
               {/* IMAGEM */}
               <Animated.Image
                 source={{ uri: image.uri }}
@@ -114,7 +123,10 @@ export default function ModalEditImage({
 
         <View style={styles.buttonContainerModal2}>
           {/* BOTÃO DE ADICIONAR STICKER */}
-          <TouchableOpacity style={styles.buttonModal}>
+          <TouchableOpacity
+            style={styles.buttonModal}
+            onPress={() => setModalSticker(true)}
+          >
             <MaterialIcons size={30} name="filter-frames" color={"white"} />
           </TouchableOpacity>
 
@@ -129,6 +141,12 @@ export default function ModalEditImage({
           </TouchableOpacity>
         </View>
       </View>
+
+      <StickerPicker
+        isVisible={modalSticker}
+        onClose={() => setModalSticker(false)}
+        onSelect={setSelectedSticker}
+      />
     </Modal>
   );
 }
@@ -149,6 +167,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     overflow: "hidden",
+    position: "absolute",
   },
   buttonContainerModal: {
     position: "absolute",
