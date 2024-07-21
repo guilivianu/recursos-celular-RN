@@ -12,6 +12,7 @@ import { useRef, useState } from "react";
 
 import { CameraView, useCameraPermissions } from "expo-camera";
 import * as ImagePicker from "expo-image-picker";
+import ModalEditImage from "./components/ModalEditImage";
 
 export default function App() {
   const camRef = useRef();
@@ -19,6 +20,9 @@ export default function App() {
   const [permission, requestPermission] = useCameraPermissions();
   const [facing, setFacing] = useState("front");
   const [image, setImage] = useState();
+  const [imageMirror, setImageMirror] = useState(-1);
+
+  const [open, setOpen] = useState(false);
 
   if (!permission) {
     return <View />;
@@ -44,19 +48,24 @@ export default function App() {
     let data = await ImagePicker.launchImageLibraryAsync({
       quality: 1,
     });
-    console.log(data);
+    // console.log(data);
+
+    setImageMirror(1);
 
     if (!data.canceled) {
-      setImage(data.assets[0].uri);
+      setImage(data.assets[0]);
+      setOpen(true);
     }
   }
 
   async function takePhoto() {
+    setImageMirror(facing === "front" ? -1 : 1);
     if (camRef) {
       let data = await camRef.current.takePictureAsync();
       // console.log(data);
 
-      setImage(data.uri);
+      setImage(data);
+      setOpen(true);
     }
   }
 
@@ -89,6 +98,18 @@ export default function App() {
           </View>
         </CameraView>
       </View>
+
+      {image && (
+        <ModalEditImage
+          image={image}
+          imageMirror={imageMirror}
+          visible={open}
+          onClose={() => {
+            setOpen(false);
+            setImage(null);
+          }}
+        />
+      )}
     </SafeAreaView>
   );
 }
