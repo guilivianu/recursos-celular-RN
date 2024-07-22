@@ -17,13 +17,16 @@ import Animated, {
   useAnimatedStyle,
   useSharedValue,
 } from "react-native-reanimated";
+import * as MediaLibrary from "expo-media-library";
 
 import StickerPicker from "./stickerPicker";
-import { useState } from "react";
+import { useState, useRef } from "react";
 import Sticker from "./Sticker";
+import { captureRef } from "react-native-view-shot";
 
-const { width, height } = Dimensions.get("screen");
+const { width, height } = Dimensions.get("screen"); // Dimensões da tela
 function clamp(val, min, max) {
+  // Função para limitar o valor da escala entre o mínimo e máximo
   return Math.min(Math.max(val, min), max);
 }
 
@@ -33,60 +36,102 @@ export default function ModalEditImage({
   visible,
   onClose,
 }) {
-  const [modalSticker, setModalSticker] = useState(false);
-  const [selectedSticker, setSelectedSticker] = useState();
+  const imageRef = useRef(); // Referência da imagem (para salvar)
+  const [modalSticker, setModalSticker] = useState(false); // Visibilidade do modal dos stickers
+  const [selectedSticker, setSelectedSticker] = useState(); // Sticker selecionado
 
-  // Alterar o tamanho da imagem
-  const startScale = useSharedValue(0);
-  const scale = useSharedValue(1);
+  // ----------------------------------------------------------------------------------------------------------------------
 
+  // ALTERAR TAMANHO DA IMAGEM
+  // Variáveis
+  const startScale = useSharedValue(0); // Escala inicial
+  const scale = useSharedValue(1); // Escala atual
+
+  // Gesto de "pinça"
   const pinch = Gesture.Pinch()
     .onStart(() => {
-      startScale.value = scale.value;
+      // Início do gesto
+      startScale.value = scale.value; // Iguala a escala inicial a escala atual da imagem no momento que o gesto inicia
     })
     .onUpdate((event) => {
+      // Durante o gesto (em cada mudança)
       scale.value = clamp(
-        startScale.value * event.scale,
-        0.3,
-        Math.min(width / 100, height / 100)
+        startScale.value * event.scale, // val ➔ Escala inicial x o aumento da escala (event.scale ➔ a porcentagem que o movimento de pinça capta que aumentou)
+        0.3, // min ➔ Escala mínima que a imagem pode chegar
+        Math.min(width / 100, height / 100) // max ➔ Escala máxima que a imagem pode chegar
       );
     })
     .runOnJS(true);
 
-  // Alterar a posição da imagem
-  const translateX = useSharedValue(0);
-  const translateY = useSharedValue(0);
+  // ----------------------------------------------------------------------------------------------------------------------
 
+  // ALTERAR POSIÇÃO DA IMAGEM
+  // Variáveis
+  const translateX = useSharedValue(0); // Posição no eixo X
+  const translateY = useSharedValue(0); // Posição no eixo Y
+
+  // Gesto de arrastar
   const drag = Gesture.Pan().onChange((event) => {
-    translateX.value += event.changeX / scale.value;
-    translateY.value += event.changeY / scale.value;
+    // Posição antes do gesto + mudança de posição (Obs: Está sendo dividido pela escala para dar fluidez ao movimento)
+    translateX.value += event.changeX / scale.value; // Eixo X
+    translateY.value += event.changeY / scale.value; // Eixo y
   });
 
-  // Rotacionar imagem
-  const startAngle = useSharedValue(0);
-  const angle = useSharedValue(0);
+  // ----------------------------------------------------------------------------------------------------------------------
 
+  // GIRAR A IMAGEM
+  // Variáveis
+  const startAngle = useSharedValue(0); // Ângulo inicial (radianos)
+  const angle = useSharedValue(0); // Ângulo atual (radianos)
+
+  // Rotacionar imagem
   const rotation = Gesture.Rotation()
     .onStart(() => {
-      startAngle.value = angle.value;
+      // Início do gesto
+      startAngle.value = angle.value; // Iguala o ângulo inicial ao ângulo atual da imagem no momento que o gesto inicia
     })
     .onUpdate((event) => {
-      angle.value = startAngle.value + event.rotation;
+      // Durante o gesto (em cada mudança)
+      angle.value = startAngle.value + event.rotation; // Ângulo final é igual a soma do ângulo inicial com a rotação durante o gesto
     });
 
+  // ----------------------------------------------------------------------------------------------------------------------
+
+  // Gesto composto com todos os gestos ("Simultaneous" para que seja possível executar todos os gestos juntos)
   const gestures = Gesture.Simultaneous(pinch, drag, rotation);
 
+  // Atualizar o style
   const imageAnimatedStyles = useAnimatedStyle(() => ({
     transform: [
-      { scaleX: imageMirror },
-      { scale: scale.value },
-      { translateX: imageMirror === -1 ? -translateX.value : translateX.value },
-      { translateY: translateY.value },
+      { scaleX: imageMirror }, // Define se a imagem deve ser espelhada ou nâo (Obs: Imagem só é espelhada no eixo X)
+      { scale: scale.value }, // Escala da imagem (gesto "drag")
+      { translateX: imageMirror === -1 ? -translateX.value : translateX.value }, // Deslocamento no eixo X
+      { translateY: translateY.value }, // Deslocamento no eixo Y
       {
-        rotate: imageMirror === -1 ? `${-angle.value}rad` : `${angle.value}rad`,
+        rotate: imageMirror === -1 ? `${-angle.value}rad` : `${angle.value}rad`, // Ângulo de rotação da imagem (radianos)
       },
     ],
   }));
+
+  // ----------------------------------------------------------------------------------------------------------------------
+
+  // Salvar a imagem
+  async function saveImage() {
+    try {
+      // Captura a imagem de acordo com uma referência (imageRef => View da área delimitada da imagem)
+      const data = await captureRef(imageRef, { quality: 1 }); // Define a qualidade da imagem como a máxima (escala vai de 0 => 1)
+      console.log(data);
+
+      await MediaLibrary.saveToLibraryAsync(data); // Salva a imagem na galeria do dispositivo
+
+      if (data) {
+        // Caso de certo (A imagem tenha sido capturada)...
+        alert("Imagem foi salva com sucesso!"); // Avisa o usuário de que a imagem foi salva
+      }
+    } catch (e) {
+      console.log(e);
+    }
+  }
 
   return (
     <Modal style={styles.container} visible={visible} animationType="slide">
@@ -95,7 +140,7 @@ export default function ModalEditImage({
         <GestureDetector gesture={gestures}>
           <SafeAreaView style={styles.container}>
             {/* ÁREA DELIMITADA DA IMAGEM */}
-            <View style={styles.imageArea}>
+            <View style={styles.imageArea} ref={imageRef}>
               {selectedSticker && <Sticker stickerSource={selectedSticker} />}
 
               {/* IMAGEM */}
@@ -131,12 +176,15 @@ export default function ModalEditImage({
           </TouchableOpacity>
 
           {/* BOTÃO DELETAR STICKERS */}
-          <TouchableOpacity style={styles.buttonModal}>
+          <TouchableOpacity
+            style={styles.buttonModal}
+            onPress={() => setSelectedSticker(null)}
+          >
             <MaterialIcons size={30} name="delete" color={"white"} />
           </TouchableOpacity>
 
           {/* BOTÃO DE SALVAR FOTO */}
-          <TouchableOpacity style={styles.buttonModal}>
+          <TouchableOpacity style={styles.buttonModal} onPress={saveImage}>
             <MaterialIcons size={30} name="download" color={"white"} />
           </TouchableOpacity>
         </View>

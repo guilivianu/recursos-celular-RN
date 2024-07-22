@@ -1,70 +1,87 @@
-import {
-  Gesture,
-  GestureHandlerRootView,
-  GestureDetector,
-} from "react-native-gesture-handler";
+import { Gesture, GestureDetector } from "react-native-gesture-handler";
 import Animated, {
   useAnimatedStyle,
   useSharedValue,
 } from "react-native-reanimated";
-import { Image, Dimensions } from "react-native";
+import { Dimensions } from "react-native";
 
-const { width, height } = Dimensions.get("screen");
+const { width, height } = Dimensions.get("screen"); // Dimensões da tela
 function clamp(val, min, max) {
+  // Função para limitar o valor da escala entre o mínimo e máximo
   return Math.min(Math.max(val, min), max);
 }
 
 export default function Sticker({ stickerSource }) {
-  // Alterar o tamanho da imagem
-  const startScale = useSharedValue(0);
-  const scale = useSharedValue(1);
+  // ALTERAR TAMANHO DA IMAGEM
+  // Variáveis
+  const startScale = useSharedValue(0); // Escala inicial
+  const scale = useSharedValue(1); // Escala atual
 
+  // Gesto de "pinça"
   const pinch = Gesture.Pinch()
     .onStart(() => {
-      startScale.value = scale.value;
+      // Início do gesto
+      startScale.value = scale.value; // Iguala a escala inicial a escala atual da imagem no momento que o gesto inicia
     })
     .onUpdate((event) => {
+      // Durante o gesto (em cada mudança)
       scale.value = clamp(
-        startScale.value * event.scale,
-        0.3,
-        Math.min(width / 100, height / 100)
+        startScale.value * event.scale, // val ➔ Escala inicial x o aumento da escala (event.scale ➔ a porcentagem que o movimento de pinça capta que aumentou)
+        0.3, // min ➔ Escala mínima que a imagem pode chegar
+        Math.min(width / 100, height / 100) // max ➔ Escala máxima que a imagem pode chegar
       );
     })
     .runOnJS(true);
 
-  // Alterar a posição da imagem
-  const translateX = useSharedValue(0);
-  const translateY = useSharedValue(0);
+  // ----------------------------------------------------------------------------------------------------------------------
 
+  // ALTERAR POSIÇÃO DA IMAGEM
+  // Variáveis
+  const translateX = useSharedValue(0); // Posição no eixo X
+  const translateY = useSharedValue(0); // Posição no eixo Y
+
+  // Gesto de arrastar
   const drag = Gesture.Pan().onChange((event) => {
-    translateX.value += event.changeX / scale.value;
-    translateY.value += event.changeY / scale.value;
+    // Posição antes do gesto + mudança de posição (Obs: Está sendo dividido pela escala para dar fluidez ao movimento)
+    translateX.value += event.changeX / scale.value; // Eixo X
+    translateY.value += event.changeY / scale.value; // Eixo y
   });
 
-  // Rotacionar imagem
-  const startAngle = useSharedValue(0);
-  const angle = useSharedValue(0);
+  // ----------------------------------------------------------------------------------------------------------------------
 
+  // GIRAR A IMAGEM
+  // Variáveis
+  const startAngle = useSharedValue(0); // Ângulo inicial (radianos)
+  const angle = useSharedValue(0); // Ângulo atual (radianos)
+
+  // Rotacionar imagem
   const rotation = Gesture.Rotation()
     .onStart(() => {
-      startAngle.value = angle.value;
+      // Início do gesto
+      startAngle.value = angle.value; // Iguala o ângulo inicial ao ângulo atual da imagem no momento que o gesto inicia
     })
     .onUpdate((event) => {
-      angle.value = startAngle.value + event.rotation;
+      // Durante o gesto (em cada mudança)
+      angle.value = startAngle.value + event.rotation; // Ângulo final é igual a soma do ângulo inicial com a rotação durante o gesto
     });
 
+  // ----------------------------------------------------------------------------------------------------------------------
+
+  // Gesto composto com todos os gestos ("Simultaneous" para que seja possível executar todos os gestos juntos)
   const gestures = Gesture.Simultaneous(pinch, drag, rotation);
 
+  // Atualizar o style
   const imageAnimatedStyles = useAnimatedStyle(() => ({
     transform: [
-      { scale: scale.value },
-      { translateX: translateX.value },
-      { translateY: translateY.value },
+      { scale: scale.value }, // Escala da imagem (gesto "drag")
+      { translateX: translateX.value }, // Deslocamento no eixo X
+      { translateY: translateY.value }, // Deslocamento no eixo Y
       {
-        rotate: `${angle.value}rad`,
+        rotate: `${angle.value}rad`, // Ângulo de rotação da imagem (radianos)
       },
     ],
   }));
+
   return (
     <GestureDetector gesture={gestures}>
       <Animated.Image

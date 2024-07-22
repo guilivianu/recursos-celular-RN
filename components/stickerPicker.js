@@ -11,6 +11,7 @@ import MaterialIcons from "@expo/vector-icons/MaterialIcons";
 import { useState } from "react";
 
 export default function StickerPicker({ isVisible, onClose, onSelect }) {
+  // Lista de stickers
   const [stickers] = useState([
     require("../assets/stickers/emoji1.png"),
     require("../assets/stickers/emoji2.png"),
